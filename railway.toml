@@ -1,0 +1,11 @@
+[[services]]
+name = "backend"
+source = "backend"
+buildCommand = "npm install && npm run build"
+startCommand = "npm start"
+
+[[services]]
+name = "frontend"
+source = "frontend"
+buildCommand = "npm install && npm run build"
+startCommand = "npm run preview"
