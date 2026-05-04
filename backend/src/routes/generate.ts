@@ -6,7 +6,7 @@ import { GenerateRequest, Session } from '../types';
 
 const router = Router();
 
-router.post('/', (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
   try {
     const body = req.body as GenerateRequest;
 
@@ -24,7 +24,6 @@ router.post('/', (req: Request, res: Response) => {
       seatsPerRow: Number(body.config?.seatsPerRow) || 10,
     };
 
-    // Validate that rows * seatsPerRow >= maxPerRoom
     if (config.rows * config.seatsPerRow < config.maxPerRoom) {
       res.status(400).json({
         error: `Configuração inválida: ${config.rows} fileiras × ${config.seatsPerRow} carteiras = ${config.rows * config.seatsPerRow} lugares, mas máximo por sala é ${config.maxPerRoom}.`,
@@ -44,7 +43,7 @@ router.post('/', (req: Request, res: Response) => {
       rooms,
     };
 
-    saveSession(session);
+    await saveSession(session);
     res.json(session);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro ao gerar distribuição.';
