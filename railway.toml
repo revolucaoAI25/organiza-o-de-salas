@@ -1,11 +1,8 @@
-[[services]]
-name = "backend"
-source = "backend"
-buildCommand = "npm install && npm run build"
-startCommand = "npm start"
+[build]
+builder = "nixpacks"
+buildCommand = "npm run install:all && npm run build"
 
-[[services]]
-name = "frontend"
-source = "frontend"
-buildCommand = "npm install && npm run build"
-startCommand = "npm run preview"
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/health"
+restartPolicyType = "on_failure"
