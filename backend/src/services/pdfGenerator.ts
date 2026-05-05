@@ -150,11 +150,19 @@ export async function generateMapPDF(
       doc.fillColor(item.color).fontSize(8).font('Helvetica-Bold').text(item.label, lx + 14, ly + 1.5);
     });
 
+    // Effective grid size: at least config values, expanded to cover any out-of-bounds allocations
+    const effectiveRows  = room.allocations.length > 0
+      ? Math.max(rows,       ...room.allocations.map(a => a.rowNumber))
+      : rows;
+    const effectiveSeats = room.allocations.length > 0
+      ? Math.max(seatsPerRow, ...room.allocations.map(a => a.seatNumber))
+      : seatsPerRow;
+
     // Seat grid dimensions
     const gridTop = ly + 20;
     const availH  = pageH - gridTop + 30;
-    const cellW   = Math.min(Math.floor((pageW - (boardPos === 'left' || boardPos === 'right' ? BOARD_SIDE + 4 : 0)) / seatsPerRow) - 2, 88);
-    const cellH   = Math.min(Math.floor((availH  - (boardPos === 'top'  || boardPos === 'bottom' ? BOARD_THICK + 4 : 0)) / rows) - 4, 50);
+    const cellW   = Math.min(Math.floor((pageW - (boardPos === 'left' || boardPos === 'right' ? BOARD_SIDE + 4 : 0)) / effectiveSeats) - 2, 88);
+    const cellH   = Math.min(Math.floor((availH  - (boardPos === 'top'  || boardPos === 'bottom' ? BOARD_THICK + 4 : 0)) / effectiveRows) - 4, 50);
 
     // Grid origin depends on board position
     const gridX = boardPos === 'left'  ? 40 + BOARD_SIDE + 4 : 40;
@@ -162,17 +170,17 @@ export async function generateMapPDF(
 
     // ── Draw board indicator ──────────────────────────────────────────
     if (boardPos === 'top' || boardPos === 'bottom') {
-      const bW = seatsPerRow * (cellW + 2) - 2;
+      const bW = effectiveSeats * (cellW + 2) - 2;
       const bY = boardPos === 'top'
         ? gridTop
-        : gridY + rows * (cellH + 4);
+        : gridY + effectiveRows * (cellH + 4);
       doc.rect(gridX, bY, bW, BOARD_THICK).fill('#1e293b');
       doc.fillColor('white').fontSize(7).font('Helvetica-Bold')
         .text('QUADRO / FRENTE DA SALA', gridX, bY + 3.5, { width: bW, align: 'center' });
     } else {
       // left or right — vertical bar with rotated text
-      const bH = rows * (cellH + 4);
-      const bX = boardPos === 'left' ? 40 : gridX + seatsPerRow * (cellW + 2);
+      const bH = effectiveRows * (cellH + 4);
+      const bX = boardPos === 'left' ? 40 : gridX + effectiveSeats * (cellW + 2);
       doc.rect(bX, gridY, BOARD_SIDE, bH).fill('#1e293b');
       // Rotated text via transform
       doc.save();
@@ -189,13 +197,13 @@ export async function generateMapPDF(
     const seatMap = new Map<string, typeof room.allocations[0]>();
     room.allocations.forEach(a => seatMap.set(`${a.rowNumber}-${a.seatNumber}`, a));
 
-    for (let r = 1; r <= rows; r++) {
+    for (let r = 1; r <= effectiveRows; r++) {
       const ry = gridY + (r - 1) * (cellH + 4);
       // Row label
       doc.fillColor('#64748b').fontSize(7).font('Helvetica-Bold')
         .text(`F${r}`, gridX - 20, ry + cellH / 2 - 4, { width: 18, align: 'right' });
 
-      for (let s = 1; s <= seatsPerRow; s++) {
+      for (let s = 1; s <= effectiveSeats; s++) {
         const cx = gridX + (s - 1) * (cellW + 2);
         const alloc = seatMap.get(`${r}-${s}`);
         if (alloc) {
