@@ -63,13 +63,13 @@ export default function RoomListView({ session: initialSession, onSessionUpdate 
     if (!editMode || !selected || !currentRoom) return [];
     const occupied = new Set(currentRoom.allocations.map(a => `${a.rowNumber}-${a.seatNumber}`));
     const empty: SeatPos[] = [];
-    for (let r = 1; r <= rows + 3; r++) {
-      for (let s = 1; s <= seatsPerRow; s++) {
+    // Each existing row: show up to seatsPerRow+3 slots
+    for (let r = 1; r <= rows + 1; r++) {
+      for (let s = 1; s <= seatsPerRow + 3; s++) {
         if (!occupied.has(`${r}-${s}`)) {
           empty.push({ roomNumber: currentRoom.roomNumber, rowNumber: r, seatNumber: s });
         }
       }
-      if (empty.length >= 24) break;
     }
     return empty;
   })();

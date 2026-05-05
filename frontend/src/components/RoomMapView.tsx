@@ -98,11 +98,12 @@ export default function RoomMapView({ session: initialSession, onSessionUpdate }
   const { rows, seatsPerRow } = session.config;
   const boardPos: BoardPos = boardPositions[selectedRoom] ?? 'left';
 
-  // Always show 3 extra empty rows beyond configured rows (buffer capacity)
+  // 3 extra seat slots per row + 1 extra row as overflow buffer
   const maxOccupiedRow = room && room.allocations.length > 0
     ? Math.max(...room.allocations.map(a => a.rowNumber))
     : 0;
-  const displayRows = Math.max(rows, maxOccupiedRow) + 3;
+  const displayRows = Math.max(rows, maxOccupiedRow) + 1;
+  const displaySeats = seatsPerRow + 3;
 
   if (!room) return null;
 
@@ -136,7 +137,7 @@ export default function RoomMapView({ session: initialSession, onSessionUpdate }
               </span>
             </div>
             <div className="flex gap-1.5 flex-wrap">
-              {Array.from({ length: seatsPerRow }, (_, si) => {
+              {Array.from({ length: displaySeats }, (_, si) => {
                 const seatNum = si + 1;
                 const pos: SeatPos = { roomNumber: room.roomNumber, rowNumber: rowNum, seatNumber: seatNum };
                 const alloc = seatMap.get(`${rowNum}-${seatNum}`);
