@@ -2,8 +2,7 @@
   "name": "exam-room-system",
   "version": "1.0.0",
   "scripts": {
-    "install:all": "(cd backend && npm install) && (cd frontend && npm install)",
-    "build": "(cd frontend && npm install --include=dev && npm run build) && cp -r frontend/dist backend/public && (cd backend && npm install --include=dev && npm run build)",
+    "build": "node scripts/build.js",
     "start": "node backend/dist/index.js",
     "dev:backend": "(cd backend && npm run dev)",
     "dev:frontend": "(cd frontend && npm run dev)"
