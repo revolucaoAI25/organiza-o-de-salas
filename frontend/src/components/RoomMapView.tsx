@@ -96,7 +96,13 @@ export default function RoomMapView({ session: initialSession, onSessionUpdate }
 
   const room = session.rooms?.find(r => r.roomNumber === selectedRoom) ?? session.rooms?.[0];
   const { rows, seatsPerRow } = session.config;
-  const boardPos: BoardPos = boardPositions[selectedRoom] ?? 'top';
+  const boardPos: BoardPos = boardPositions[selectedRoom] ?? 'left';
+
+  // Always show 3 extra empty rows beyond configured rows (buffer capacity)
+  const maxOccupiedRow = room && room.allocations.length > 0
+    ? Math.max(...room.allocations.map(a => a.rowNumber))
+    : 0;
+  const displayRows = Math.max(rows, maxOccupiedRow) + 3;
 
   if (!room) return null;
 
@@ -120,7 +126,7 @@ export default function RoomMapView({ session: initialSession, onSessionUpdate }
 
   const grid = (
     <div className="space-y-2">
-      {Array.from({ length: rows }, (_, ri) => {
+      {Array.from({ length: displayRows }, (_, ri) => {
         const rowNum = ri + 1;
         return (
           <div key={rowNum} className="flex items-center gap-2">

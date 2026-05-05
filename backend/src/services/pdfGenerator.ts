@@ -124,7 +124,7 @@ export async function generateMapPDF(
 
     const pageW = doc.page.width - 80;
     const pageH = doc.page.height - 80;
-    const boardPos: BoardPos = (boardPositions[room.roomNumber] ?? 'top') as BoardPos;
+    const boardPos: BoardPos = (boardPositions[room.roomNumber] ?? 'left') as BoardPos;
 
     // Header
     doc.rect(40, 40, pageW, 40).fill('#1e3a5f');

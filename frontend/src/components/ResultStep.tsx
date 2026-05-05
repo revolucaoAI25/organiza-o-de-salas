@@ -74,7 +74,7 @@ export default function ResultStep({ session: initialSession, students, onBack, 
       {/* View content */}
       <div className="flex-1 min-h-0" style={{ minHeight: '500px' }}>
         {view === 'list' ? (
-          <RoomListView rooms={session.rooms ?? []} />
+          <RoomListView session={session} onSessionUpdate={setSession} />
         ) : (
           <RoomMapView session={session} onSessionUpdate={setSession} />
         )}
