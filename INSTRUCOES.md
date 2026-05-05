@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS exam_sessions (
 1. Acesse **railway.app** e crie uma conta com **Login with GitHub**
 2. Clique em **New Project → Deploy from GitHub repo**
 3. Selecione o repositório que você criou no Passo 1
-4. Selecione o branch **`claude/generate-exam-lists-puvwQ`**
+4. Selecione o branch **`main`**
 5. Clique em **Deploy Now** e aguarde 2 a 4 minutos
 
 ---

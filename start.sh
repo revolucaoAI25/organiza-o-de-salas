@@ -46,7 +46,7 @@ echo ""
 export NODE_ENV=production
 export PORT=8080
 
-# Abrir o navegador automaticamente (funciona no Mac)
-sleep 2 && open "http://localhost:8080" 2>/dev/null &
+# Abrir o navegador automaticamente (Mac e Linux)
+sleep 2 && (open "http://localhost:8080" 2>/dev/null || xdg-open "http://localhost:8080" 2>/dev/null) &
 
 node backend/dist/index.js

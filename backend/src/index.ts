@@ -39,6 +39,15 @@ if (isProd && fs.existsSync(frontendDist)) {
   });
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT} (${isProd ? 'production' : 'development'})`);
+});
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n[ERRO] A porta ${PORT} já está em uso.`);
+    console.error('Feche o outro processo do sistema e tente novamente.\n');
+  } else {
+    console.error('[ERRO] Falha ao iniciar o servidor:', err.message);
+  }
+  process.exit(1);
 });
