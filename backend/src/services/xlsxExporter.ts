@@ -37,6 +37,49 @@ export async function generateXLSX(session: Session): Promise<Buffer> {
     });
   });
 
+  // ── Consolidated sheet (all students) ────────────────────────────────
+  const consolidated = wb.addWorksheet('Todos os Alunos');
+  consolidated.columns = [
+    { header: 'Nº',        key: 'num',   width: 6  },
+    { header: 'Nome',      key: 'name',  width: 42 },
+    { header: 'Série',     key: 'grade', width: 14 },
+    { header: 'Turma',     key: 'class', width: 14 },
+    { header: 'Matrícula', key: 'id',    width: 14 },
+    { header: 'Sala',      key: 'room',  width: 12 },
+    { header: 'Fileira',   key: 'row',   width: 10 },
+    { header: 'Carteira',  key: 'seat',  width: 10 },
+  ];
+
+  const chdr = consolidated.getRow(1);
+  chdr.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  chdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+  chdr.alignment = { vertical: 'middle', horizontal: 'center' };
+
+  // Flatten all allocations sorted by student name
+  const allEntries = rooms.flatMap(room =>
+    room.allocations.map(a => ({ ...a, roomName: room.roomName }))
+  ).sort((a, b) => a.studentName.localeCompare(b.studentName, 'pt-BR'));
+
+  allEntries.forEach((entry, idx) => {
+    const row = consolidated.addRow({
+      num:   idx + 1,
+      name:  entry.studentName,
+      grade: entry.grade,
+      class: entry.classCode,
+      id:    entry.studentId,
+      room:  entry.roomName,
+      row:   `Fileira ${entry.rowNumber}`,
+      seat:  `C${entry.seatNumber}`,
+    });
+    const fill = GRADE_FILLS[entry.grade];
+    if (fill) row.getCell('grade').fill = { type: 'pattern', pattern: 'solid', fgColor: fill };
+    row.getCell('num').alignment = { horizontal: 'center' };
+    row.getCell('seat').alignment = { horizontal: 'center' };
+  });
+
+  consolidated.views = [{ state: 'frozen', ySplit: 1 }];
+  consolidated.autoFilter = { from: 'A1', to: 'H1' };
+
   // ── One sheet per room ────────────────────────────────────────────────
   rooms.forEach(room => {
     const ws = wb.addWorksheet(room.roomName);
