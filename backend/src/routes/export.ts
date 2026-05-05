@@ -13,24 +13,25 @@ router.get('/:id/pdf', async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="salas-${slugify(session.name)}.pdf"`);
     res.send(pdf);
-  } catch (err: unknown) {
-    console.error('PDF list error:', err);
-    res.status(500).json({ error: 'Erro ao gerar PDF.' });
-  }
+  } catch (err) { console.error('PDF list error:', err); res.status(500).json({ error: 'Erro ao gerar PDF.' }); }
 });
 
 router.get('/:id/pdf-map', async (req: Request, res: Response) => {
   try {
     const session = await getSession(String(req.params.id));
     if (!session) { res.status(404).json({ error: 'Sessão não encontrada.' }); return; }
-    const pdf = await generateMapPDF(session);
+
+    // Board positions are passed as a JSON query parameter from the frontend
+    let boardPositions: Record<number, string> = {};
+    if (req.query.positions) {
+      try { boardPositions = JSON.parse(String(req.query.positions)); } catch { /* ignore */ }
+    }
+
+    const pdf = await generateMapPDF(session, boardPositions);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="mapa-${slugify(session.name)}.pdf"`);
     res.send(pdf);
-  } catch (err: unknown) {
-    console.error('PDF map error:', err);
-    res.status(500).json({ error: 'Erro ao gerar mapa PDF.' });
-  }
+  } catch (err) { console.error('PDF map error:', err); res.status(500).json({ error: 'Erro ao gerar mapa PDF.' }); }
 });
 
 router.get('/:id/xlsx', async (req: Request, res: Response) => {
@@ -41,10 +42,7 @@ router.get('/:id/xlsx', async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="salas-${slugify(session.name)}.xlsx"`);
     res.send(xlsx);
-  } catch (err: unknown) {
-    console.error('XLSX error:', err);
-    res.status(500).json({ error: 'Erro ao gerar XLSX.' });
-  }
+  } catch (err) { console.error('XLSX error:', err); res.status(500).json({ error: 'Erro ao gerar XLSX.' }); }
 });
 
 function slugify(s: string): string {

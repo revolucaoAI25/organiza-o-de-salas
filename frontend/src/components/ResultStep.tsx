@@ -76,7 +76,7 @@ export default function ResultStep({ session: initialSession, students, onBack, 
         {view === 'list' ? (
           <RoomListView rooms={session.rooms ?? []} />
         ) : (
-          <RoomMapView session={session} />
+          <RoomMapView session={session} onSessionUpdate={setSession} />
         )}
       </div>
     </div>
