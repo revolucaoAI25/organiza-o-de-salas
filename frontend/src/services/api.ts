@@ -48,7 +48,7 @@ export async function swapSeats(sessionId: string, from: SeatPos, to: SeatPos): 
   }));
 }
 
-export function exportUrl(id: string, type: 'pdf' | 'pdf-map' | 'xlsx', extra?: string): string {
+export function exportUrl(id: string, type: 'pdf' | 'pdf-map' | 'pdf-turmas' | 'pdf-assinaturas' | 'xlsx', extra?: string): string {
   const url = `${BASE}/export/${id}/${type}`;
   return extra ? `${url}?${extra}` : url;
 }

@@ -236,3 +236,178 @@ export async function generateMapPDF(
   doc.end();
   return buf;
 }
+
+// ── Class list PDF (grouped by turma) ─────────────────────────────────────
+
+export async function generateClassListPDF(session: Session): Promise<Buffer> {
+  const doc = new PDFDocument({ margin: 40, size: 'A4', autoFirstPage: true });
+  const buf = docToBuffer(doc);
+  const pageW = doc.page.width - 80;
+
+  const allEntries = (session.rooms ?? []).flatMap(room =>
+    room.allocations.map(a => ({
+      ...a,
+      roomName: room.roomName,
+      building: room.building ?? '',
+      floor: room.floor ?? '',
+    }))
+  );
+
+  const classMap = new Map<string, typeof allEntries>();
+  for (const e of allEntries) {
+    if (!classMap.has(e.classCode)) classMap.set(e.classCode, []);
+    classMap.get(e.classCode)!.push(e);
+  }
+
+  const turmas = [...classMap.keys()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  turmas.forEach(t => classMap.get(t)!.sort((a, b) => a.studentName.localeCompare(b.studentName, 'pt-BR')));
+
+  const cols = { num: 50, name: 90, room: 332, location: 382, place: 500 };
+  const colW = { num: 36, name: 238, room: 46, location: 114, place: 60 };
+  const ROW_H = 15;
+
+  function drawPageHeader() {
+    doc.rect(40, 40, pageW, 52).fill('#1e3a5f');
+    doc.fillColor('white').fontSize(13).font('Helvetica-Bold')
+      .text(session.config.institutionName || 'Distribuição de Salas de Prova', 50, 48, { width: pageW - 20 });
+    doc.fontSize(9).font('Helvetica')
+      .text(`${session.config.sessionName}   ·   ${session.config.examDate}   ·   Lista por Turma`, 50, 64, { width: pageW - 20 });
+  }
+
+  function drawTableHeader(ty: number) {
+    doc.rect(40, ty, pageW, 16).fill('#334155');
+    doc.fillColor('white').fontSize(7.5).font('Helvetica-Bold');
+    doc.text('Nº',          cols.num,      ty + 4, { width: colW.num });
+    doc.text('Nome',        cols.name,     ty + 4, { width: colW.name });
+    doc.text('Sala',        cols.room,     ty + 4, { width: colW.room });
+    doc.text('Localização', cols.location, ty + 4, { width: colW.location });
+    doc.text('Lugar',       cols.place,    ty + 4, { width: colW.place });
+    return ty + 16;
+  }
+
+  drawPageHeader();
+  let y = 102;
+
+  turmas.forEach((turma, ti) => {
+    const students = classMap.get(turma)!;
+    const grade = students[0]?.grade ?? '';
+    const needed = 20 + 16 + students.length * ROW_H;
+    if (ti > 0 && y + needed > doc.page.height - 50) {
+      doc.addPage();
+      drawPageHeader();
+      y = 102;
+    }
+
+    doc.rect(40, y, pageW, 18).fill(gb(grade));
+    doc.fillColor(gc(grade)).fontSize(11).font('Helvetica-Bold')
+      .text(turma, 50, y + 3.5, { width: 200 });
+    doc.fontSize(8.5).font('Helvetica')
+      .text(`${grade}   ·   ${students.length} aluno${students.length !== 1 ? 's' : ''}`, 260, y + 5, { width: pageW - 220 });
+    y += 18;
+    y = drawTableHeader(y);
+
+    students.forEach((e, idx) => {
+      if (y > doc.page.height - 50) {
+        doc.addPage();
+        drawPageHeader();
+        y = 102;
+        y = drawTableHeader(y);
+      }
+      const location = e.building
+        ? `Préd. ${e.building}${e.floor ? ' · ' + e.floor : ''}`
+        : '';
+      doc.rect(40, y, pageW, ROW_H).fill(idx % 2 === 0 ? '#ffffff' : '#f8fafc');
+      doc.fillColor('#111827').fontSize(7.5).font('Helvetica');
+      doc.text(String(idx + 1), cols.num,      y + 3.5, { width: colW.num });
+      doc.text(e.studentName,   cols.name,     y + 3.5, { width: colW.name });
+      doc.text(e.roomName,      cols.room,     y + 3.5, { width: colW.room });
+      doc.text(location,        cols.location, y + 3.5, { width: colW.location });
+      doc.fillColor('#6b7280').fontSize(7).font('Helvetica')
+        .text(`F${e.rowNumber}·C${e.seatNumber}`, cols.place, y + 3.5, { width: colW.place });
+      y += ROW_H;
+    });
+    y += 6;
+  });
+
+  doc.fillColor('#9ca3af').fontSize(7).font('Helvetica')
+    .text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, 40, doc.page.height - 30, {
+      width: pageW, align: 'center',
+    });
+  doc.end();
+  return buf;
+}
+
+// ── Signature list PDF (by room, one blank line per student for signing) ───
+
+export async function generateSignaturePDF(session: Session): Promise<Buffer> {
+  const doc = new PDFDocument({ margin: 40, size: 'A4', autoFirstPage: true });
+  const buf = docToBuffer(doc);
+  const rooms = session.rooms ?? [];
+  const pageW = doc.page.width - 80;
+  const ROW_H = 22;
+  const SIG_X = 310;
+  const SIG_W = pageW - (SIG_X - 40);
+
+  function drawRoomTableHeader(ty: number) {
+    doc.rect(40, ty, pageW, 16).fill('#334155');
+    doc.fillColor('white').fontSize(7.5).font('Helvetica-Bold');
+    doc.text('Nº',         50,     ty + 4, { width: 28 });
+    doc.text('Lugar',      82,     ty + 4, { width: 52 });
+    doc.text('Nome',       138,    ty + 4, { width: SIG_X - 148 });
+    doc.text('Assinatura', SIG_X,  ty + 4, { width: SIG_W });
+    return ty + 16;
+  }
+
+  rooms.forEach((room, ri) => {
+    if (ri > 0) doc.addPage();
+
+    doc.rect(40, 40, pageW, 52).fill('#1e3a5f');
+    doc.fillColor('white').fontSize(13).font('Helvetica-Bold')
+      .text(session.config.institutionName || 'Distribuição de Salas de Prova', 50, 48, { width: pageW - 20 });
+    doc.fontSize(9).font('Helvetica')
+      .text(`${session.config.sessionName}   ·   ${session.config.examDate}   ·   Lista de Presença`, 50, 64, { width: pageW - 20 });
+
+    const iy = 102;
+    doc.rect(40, iy, pageW, 24).fill('#e8edf4');
+    const roomLabel = room.building
+      ? `${room.roomName}  (Prédio ${room.building}${room.floor ? ' · ' + room.floor : ''})`
+      : room.roomName;
+    doc.fillColor('#1e3a5f').fontSize(11).font('Helvetica-Bold')
+      .text(roomLabel, 50, iy + 6, { width: 220 });
+    doc.fillColor('#374151').fontSize(9).font('Helvetica')
+      .text(`Total: ${room.allocations.length}   |   1ª: ${room.stats.grade1}   2ª: ${room.stats.grade2}   3ª: ${room.stats.grade3}`,
+        275, iy + 8, { width: pageW - 235 });
+
+    let y = drawRoomTableHeader(136);
+
+    const sorted = [...room.allocations].sort((a, b) =>
+      a.rowNumber !== b.rowNumber ? a.rowNumber - b.rowNumber : a.seatNumber - b.seatNumber
+    );
+
+    sorted.forEach((alloc, idx) => {
+      if (y > doc.page.height - 50) {
+        doc.addPage();
+        y = drawRoomTableHeader(40);
+      }
+      doc.rect(40, y, pageW, ROW_H).fill(idx % 2 === 0 ? '#ffffff' : '#f8fafc');
+      doc.fillColor('#9ca3af').fontSize(7).font('Helvetica')
+        .text(String(idx + 1), 50, y + 8, { width: 28 });
+      doc.fillColor('#6b7280').fontSize(7)
+        .text(`F${alloc.rowNumber}·C${alloc.seatNumber}`, 82, y + 8, { width: 52 });
+      doc.fillColor('#111827').fontSize(8.5).font('Helvetica-Bold')
+        .text(alloc.studentName, 138, y + 8, { width: SIG_X - 148 });
+      const lineY = y + ROW_H - 5;
+      doc.moveTo(SIG_X, lineY).lineTo(SIG_X + SIG_W - 10, lineY)
+        .strokeColor('#94a3b8').lineWidth(0.5).stroke();
+      y += ROW_H;
+    });
+
+    doc.fillColor('#9ca3af').fontSize(7).font('Helvetica')
+      .text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, 40, doc.page.height - 30, {
+        width: pageW, align: 'center',
+      });
+  });
+
+  doc.end();
+  return buf;
+}

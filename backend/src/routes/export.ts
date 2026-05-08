@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { generateListPDF, generateMapPDF } from '../services/pdfGenerator';
+import { generateListPDF, generateMapPDF, generateClassListPDF, generateSignaturePDF } from '../services/pdfGenerator';
 import { generateXLSX } from '../services/xlsxExporter';
 import { getSession } from '../storage';
 
@@ -43,6 +43,28 @@ router.get('/:id/xlsx', async (req: Request, res: Response) => {
     res.setHeader('Content-Disposition', `attachment; filename="salas-${slugify(session.name)}.xlsx"`);
     res.send(xlsx);
   } catch (err) { console.error('XLSX error:', err); res.status(500).json({ error: 'Erro ao gerar XLSX.' }); }
+});
+
+router.get('/:id/pdf-turmas', async (req: Request, res: Response) => {
+  try {
+    const session = await getSession(String(req.params.id));
+    if (!session) { res.status(404).json({ error: 'Sessão não encontrada.' }); return; }
+    const pdf = await generateClassListPDF(session);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="turmas-${slugify(session.name)}.pdf"`);
+    res.send(pdf);
+  } catch (err) { console.error('PDF turmas error:', err); res.status(500).json({ error: 'Erro ao gerar PDF por turma.' }); }
+});
+
+router.get('/:id/pdf-assinaturas', async (req: Request, res: Response) => {
+  try {
+    const session = await getSession(String(req.params.id));
+    if (!session) { res.status(404).json({ error: 'Sessão não encontrada.' }); return; }
+    const pdf = await generateSignaturePDF(session);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="assinaturas-${slugify(session.name)}.pdf"`);
+    res.send(pdf);
+  } catch (err) { console.error('PDF assinaturas error:', err); res.status(500).json({ error: 'Erro ao gerar PDF de assinaturas.' }); }
 });
 
 function slugify(s: string): string {
