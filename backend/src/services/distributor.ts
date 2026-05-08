@@ -56,11 +56,9 @@ function reduceAdjacentSameClass(
   for (let pass = 0; pass < maxSwaps; pass++) {
     let swapped = false;
     for (let i = 0; i < arr.length - 1; i++) {
-      // Only check within the same row
       const sameRow = Math.floor(i / seatsPerRow) === Math.floor((i + 1) / seatsPerRow);
       if (!sameRow) continue;
       if (arr[i].classCode && arr[i].classCode === arr[i + 1].classCode) {
-        // Find a candidate to swap arr[i+1] with (different row or different class)
         let swapIdx = -1;
         for (let j = i + 2; j < arr.length; j++) {
           if (arr[j].classCode !== arr[i].classCode) {
@@ -79,22 +77,70 @@ function reduceAdjacentSameClass(
   return arr;
 }
 
+/**
+ * Assigns row/seat positions, respecting the configured layout while avoiding
+ * near-empty rows.
+ *
+ * Rules (priority order):
+ *  1. Use at least configRows rows — the layout the user set.
+ *  2. Add extra rows only when students overflow configRows × seatsPerRow:
+ *       - Overflow ≤ 3: absorb into existing rows (tiny seatsPerRow overrun).
+ *       - Overflow > 3: add one more row, distribute evenly across all.
+ *  3. Use fewer than configRows only if spreading across all rows would give
+ *     < 3 students per row (avoids rows with just 1-2 students).
+ *
+ * Students are always spread evenly across the chosen number of rows.
+ */
+function assignSeats(students: Student[], seatsPerRow: number, configRows: number): Allocation[] {
+  const N = students.length;
+  if (N === 0) return [];
+
+  // Natural rows needed given seatsPerRow (with near-empty-last-row rule)
+  const baseRows = Math.max(1, Math.floor(N / seatsPerRow));
+  const remainder = N % seatsPerRow;
+  const naturalRows = (remainder === 0 || remainder <= 3) ? baseRows : baseRows + 1;
+
+  // Prefer configRows as minimum; cap only when rows would have < 3 students
+  const maxRowsByDensity = Math.max(1, Math.floor(N / 3));
+  const targetRows = Math.min(
+    Math.max(configRows, naturalRows),
+    maxRowsByDensity,
+  );
+
+  // Even distribution via largest-remainder method
+  const raw = N / targetRows;
+  const perRow = Array.from({ length: targetRows }, () => Math.floor(raw));
+  let leftover = N - perRow.reduce((s, c) => s + c, 0);
+  for (let i = 0; i < leftover; i++) perRow[i]++;
+
+  const allocations: Allocation[] = [];
+  let si = 0;
+  for (let r = 0; r < targetRows; r++) {
+    for (let s = 0; s < perRow[r]; s++) {
+      allocations.push({
+        studentName: students[si].name,
+        studentId: students[si].studentId,
+        grade: students[si].grade,
+        classCode: students[si].classCode,
+        rowNumber: r + 1,
+        seatNumber: s + 1,
+      });
+      si++;
+    }
+  }
+  return allocations;
+}
+
 function buildRoom(
   roomStudents: Student[],
   roomNumber: number,
   roomName: string,
   seatsPerRow: number,
+  configRows: number,
   building?: string,
   floor?: string,
 ): Room {
-  const allocations: Allocation[] = roomStudents.map((student, idx) => ({
-    studentName: student.name,
-    studentId: student.studentId,
-    grade: student.grade,
-    classCode: student.classCode,
-    rowNumber: Math.floor(idx / seatsPerRow) + 1,
-    seatNumber: (idx % seatsPerRow) + 1,
-  }));
+  const allocations = assignSeats(roomStudents, seatsPerRow, configRows);
 
   const stats = {
     grade1: roomStudents.filter(s => s.grade === '1ª SÉRIE').length,
@@ -109,7 +155,7 @@ export function distribute(
   students: Student[],
   config: SessionConfig
 ): Room[] {
-  const { maxPerRoom, rows: _rows, seatsPerRow } = config;
+  const { maxPerRoom, rows, seatsPerRow } = config;
 
   const g1 = shuffle(students.filter(s => s.grade === '1ª SÉRIE'));
   const g2 = shuffle(students.filter(s => s.grade === '2ª SÉRIE'));
@@ -119,14 +165,36 @@ export function distribute(
   const rooms: Room[] = [];
 
   if (config.selectedRooms && config.selectedRooms.length > 0) {
-    // Catalog mode: fill each selected room up to its individual capacity
+    // Catalog mode: use minimum rooms needed, distribute proportionally
+    const total = interleaved.length;
+
+    // Find the minimum prefix of selected rooms whose combined capacity >= total
+    let cumCap = 0;
+    let roomCount = 0;
+    for (const room of config.selectedRooms) {
+      cumCap += room.capacity;
+      roomCount++;
+      if (cumCap >= total) break;
+    }
+    const activeRooms = config.selectedRooms.slice(0, roomCount);
+    const totalActiveCap = activeRooms.reduce((s, r) => s + r.capacity, 0);
+
+    // Proportional allocation via largest-remainder method
+    const rawShares = activeRooms.map(r => (total * r.capacity) / totalActiveCap);
+    const floorShares = rawShares.map(x => Math.floor(x));
+    const remainder = total - floorShares.reduce((s, c) => s + c, 0);
+    rawShares
+      .map((x, i) => ({ i, frac: x - floorShares[i] }))
+      .sort((a, b) => b.frac - a.frac)
+      .slice(0, remainder)
+      .forEach(({ i }) => floorShares[i]++);
+
     let offset = 0;
-    config.selectedRooms.forEach((roomDef, i) => {
-      if (offset >= interleaved.length) return;
-      const chunk = interleaved.slice(offset, offset + roomDef.capacity);
+    activeRooms.forEach((roomDef, i) => {
+      const chunk = interleaved.slice(offset, offset + floorShares[i]);
       offset += chunk.length;
       const roomStudents = reduceAdjacentSameClass(chunk, seatsPerRow);
-      rooms.push(buildRoom(roomStudents, i + 1, roomDef.name, seatsPerRow, roomDef.building, roomDef.floor));
+      rooms.push(buildRoom(roomStudents, i + 1, roomDef.name, seatsPerRow, rows, roomDef.building, roomDef.floor));
     });
   } else {
     // Auto mode: split into equal chunks of maxPerRoom
@@ -134,7 +202,7 @@ export function distribute(
       const chunk = interleaved.slice(i, i + maxPerRoom);
       const roomNumber = Math.floor(i / maxPerRoom) + 1;
       const roomStudents = reduceAdjacentSameClass(chunk, seatsPerRow);
-      rooms.push(buildRoom(roomStudents, roomNumber, `Sala ${roomNumber.toString().padStart(2, '0')}`, seatsPerRow));
+      rooms.push(buildRoom(roomStudents, roomNumber, `Sala ${roomNumber.toString().padStart(2, '0')}`, seatsPerRow, rows));
     }
   }
 
