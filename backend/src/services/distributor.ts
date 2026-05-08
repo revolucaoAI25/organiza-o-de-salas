@@ -79,6 +79,47 @@ function reduceAdjacentSameClass(
   return arr;
 }
 
+/**
+ * Assigns row/seat positions to students, avoiding a near-empty last row.
+ *
+ * Rule: if the remainder (students that would spill into a new row) is ≤ 3,
+ * absorb them into the existing rows (slightly exceeding seatsPerRow) instead
+ * of creating a lonely last row. If remainder > 3 a new row is created, but
+ * students are distributed evenly across ALL rows so no row ends up with
+ * just 1-2 students.
+ */
+function assignSeats(students: Student[], seatsPerRow: number): Allocation[] {
+  const N = students.length;
+  if (N === 0) return [];
+
+  const baseRows = Math.max(1, Math.floor(N / seatsPerRow));
+  const remainder = N % seatsPerRow;
+  const targetRows = (remainder === 0 || remainder <= 3) ? baseRows : baseRows + 1;
+
+  // Even distribution across targetRows via largest-remainder method
+  const raw = N / targetRows;
+  const perRow = Array.from({ length: targetRows }, () => Math.floor(raw));
+  let leftover = N - perRow.reduce((s, c) => s + c, 0);
+  for (let i = 0; i < leftover; i++) perRow[i]++;
+
+  const allocations: Allocation[] = [];
+  let si = 0;
+  for (let r = 0; r < targetRows; r++) {
+    for (let s = 0; s < perRow[r]; s++) {
+      allocations.push({
+        studentName: students[si].name,
+        studentId: students[si].studentId,
+        grade: students[si].grade,
+        classCode: students[si].classCode,
+        rowNumber: r + 1,
+        seatNumber: s + 1,
+      });
+      si++;
+    }
+  }
+  return allocations;
+}
+
 function buildRoom(
   roomStudents: Student[],
   roomNumber: number,
@@ -87,14 +128,7 @@ function buildRoom(
   building?: string,
   floor?: string,
 ): Room {
-  const allocations: Allocation[] = roomStudents.map((student, idx) => ({
-    studentName: student.name,
-    studentId: student.studentId,
-    grade: student.grade,
-    classCode: student.classCode,
-    rowNumber: Math.floor(idx / seatsPerRow) + 1,
-    seatNumber: (idx % seatsPerRow) + 1,
-  }));
+  const allocations = assignSeats(roomStudents, seatsPerRow);
 
   const stats = {
     grade1: roomStudents.filter(s => s.grade === '1ª SÉRIE').length,
