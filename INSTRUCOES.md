@@ -37,11 +37,9 @@ Instale os dois antes de começar. Em ambos, basta avançar o instalador com as 
 Abra o **Prompt de Comando** (Windows) ou o **Terminal** (Mac) e execute:
 
 ```
-git clone LINK-DO-REPOSITÓRIO
-cd NOME-DA-PASTA
+git clone https://github.com/revolucaoAI25/organiza-o-de-salas
+cd organiza-o-de-salas
 ```
-
-> Substitua pelo link do repositório que foi enviado a você.
 
 **Alternativa sem Git:** na página do repositório no GitHub, clique em **Code → Download ZIP**, extraia a pasta em algum lugar fácil de encontrar (ex: `C:\SistemaProvas`).
 
