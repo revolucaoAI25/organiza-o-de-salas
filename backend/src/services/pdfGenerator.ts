@@ -13,7 +13,7 @@ const gc = (g: string) => GRADE_COLOR[g] ?? '#374151';
 const gb = (g: string) => GRADE_BG[g] ?? '#f3f4f6';
 
 // Logo at backend/assets/logo.png — drop the file there and it appears automatically
-const LOGO_PATH = path.join(__dirname, '..', '..', 'assets', 'logo.png');
+const LOGO_PATH = path.join(__dirname, '..', '..', 'assets', 'Marca_CSDBH_BRANCA.png');
 
 type BoardPos = 'top' | 'bottom' | 'left' | 'right';
 
