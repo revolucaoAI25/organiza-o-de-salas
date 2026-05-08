@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { List, LayoutGrid, Loader2 } from 'lucide-react';
+import { List, LayoutGrid, Users, Loader2 } from 'lucide-react';
 import { Session, Student } from '../types';
 import { generateDistribution } from '../services/api';
 import RoomListView from './RoomListView';
 import RoomMapView from './RoomMapView';
+import ClassListView from './ClassListView';
 import ExportBar from './ExportBar';
 
-type View = 'list' | 'map';
+type View = 'list' | 'map' | 'classes';
 
 interface Props {
   session: Session;
@@ -37,7 +38,6 @@ export default function ResultStep({ session: initialSession, students, onBack, 
 
   return (
     <div className="space-y-4 h-full flex flex-col">
-      {/* Export / actions bar */}
       <ExportBar session={session} onRegenerate={handleRegenerate} />
 
       {regenerating && (
@@ -55,7 +55,11 @@ export default function ResultStep({ session: initialSession, students, onBack, 
         <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
           <TabBtn active={view === 'list'} onClick={() => setView('list')}>
             <List className="w-3.5 h-3.5" />
-            Lista
+            Por Sala
+          </TabBtn>
+          <TabBtn active={view === 'classes'} onClick={() => setView('classes')}>
+            <Users className="w-3.5 h-3.5" />
+            Por Turma
           </TabBtn>
           <TabBtn active={view === 'map'} onClick={() => setView('map')}>
             <LayoutGrid className="w-3.5 h-3.5" />
@@ -75,6 +79,8 @@ export default function ResultStep({ session: initialSession, students, onBack, 
       <div className="flex-1 min-h-0" style={{ minHeight: '500px' }}>
         {view === 'list' ? (
           <RoomListView session={session} onSessionUpdate={setSession} />
+        ) : view === 'classes' ? (
+          <ClassListView session={session} />
         ) : (
           <RoomMapView session={session} onSessionUpdate={setSession} />
         )}
