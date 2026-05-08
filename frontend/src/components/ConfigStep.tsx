@@ -37,7 +37,7 @@ export default function ConfigStep({ students, parseResult, onBack, onGenerated 
     [selectedRoomIds]
   );
 
-  // Mirror the backend logic: find the minimum prefix of rooms needed
+  // Mirror backend logic: minimum prefix of rooms needed to cover all students
   const activeRooms = useMemo(() => {
     if (!catalogMode || selectedRooms.length === 0) return selectedRooms;
     let cap = 0;
@@ -299,9 +299,7 @@ export default function ConfigStep({ students, parseResult, onBack, onGenerated 
             <span className="font-bold text-slate-800">
               {roomsNeeded}
               {catalogMode && selectedRooms.length > activeRooms.length && (
-                <span className="ml-1 text-xs font-normal text-slate-400">
-                  de {selectedRooms.length} selecionadas
-                </span>
+                <span className="ml-1 text-xs font-normal text-slate-400">de {selectedRooms.length} selecionadas</span>
               )}
             </span>
             {catalogMode ? (

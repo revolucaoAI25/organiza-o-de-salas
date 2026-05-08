@@ -29,7 +29,7 @@ router.post('/', async (req: Request, res: Response) => {
       selectedRooms,
     };
 
-    // In catalog mode individual room capacities are used, layout check is irrelevant
+    // In catalog mode individual room capacities are used; layout check is irrelevant
     if (!selectedRooms && config.rows * config.seatsPerRow < config.maxPerRoom) {
       res.status(400).json({
         error: `Configuração inválida: ${config.rows} fileiras × ${config.seatsPerRow} carteiras = ${config.rows * config.seatsPerRow} lugares, mas máximo por sala é ${config.maxPerRoom}.`,
