@@ -26,6 +26,8 @@ function docToBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
   });
 }
 
+const HEADER_H = 64;
+
 function drawHeader(
   doc: PDFKit.PDFDocument,
   pageW: number,
@@ -33,16 +35,19 @@ function drawHeader(
   subtitle: string,
 ) {
   const hasLogo = fs.existsSync(LOGO_PATH);
-  doc.rect(40, 40, pageW, 52).fill('#1e3a5f');
+  doc.rect(40, 40, pageW, HEADER_H).fill('#1e3a5f');
   if (hasLogo) {
-    try { doc.image(LOGO_PATH, 46, 43, { height: 46, fit: [56, 46] }); } catch { /* ignore */ }
+    // Render logo on the left; logo image may include wordmark so keep it compact
+    try { doc.image(LOGO_PATH, 44, 44, { height: 56, fit: [56, 56] }); } catch { /* ignore */ }
   }
-  const textX = hasLogo ? 110 : 50;
-  const textW = pageW - (hasLogo ? 70 : 20);
+  const textX = hasLogo ? 108 : 50;
+  const textW = pageW - (hasLogo ? 68 : 20);
+  // Strip any embedded newlines that would overflow the fixed-height header
+  const cleanName = (institutionName || 'Distribuição de Salas de Prova').replace(/[\r\n]+/g, ' ').trim();
   doc.fillColor('white').fontSize(13).font('Helvetica-Bold')
-    .text(institutionName || 'Distribuição de Salas de Prova', textX, 48, { width: textW, lineBreak: false });
+    .text(cleanName, textX, 48, { width: textW, lineBreak: false, ellipsis: true });
   doc.fontSize(9).font('Helvetica')
-    .text(subtitle, textX, 64, { width: textW, lineBreak: false });
+    .text(subtitle, textX, 66, { width: textW, lineBreak: false });
 }
 
 // ── List PDF ───────────────────────────────────────────────────────────────
@@ -74,7 +79,7 @@ export async function generateListPDF(session: Session): Promise<Buffer> {
 
     drawHeader(doc, pageW, session.config.institutionName || 'Distribuição de Salas de Prova', subtitle);
 
-    const iy = 102;
+    const iy = 114;
     doc.rect(40, iy, pageW, 24).fill('#e8edf4');
     const roomLabel = room.building
       ? `${room.roomName}  (Prédio ${room.building}${room.floor ? ' · ' + room.floor : ''})`
@@ -87,7 +92,7 @@ export async function generateListPDF(session: Session): Promise<Buffer> {
         275, iy + 8, { width: pageW - 235, lineBreak: false }
       );
 
-    let y = drawTableHeader(136);
+    let y = drawTableHeader(148);
     let curRow = 0;
 
     room.allocations.forEach((alloc, idx) => {
@@ -297,7 +302,7 @@ export async function generateClassListPDF(session: Session): Promise<Buffer> {
   }
 
   drawPageHeader();
-  let y = 102;
+  let y = 114;
 
   turmas.forEach((turma, ti) => {
     const students = classMap.get(turma)!;
@@ -307,7 +312,7 @@ export async function generateClassListPDF(session: Session): Promise<Buffer> {
     if (ti > 0 && y + minNeeded > doc.page.height - 60) {
       doc.addPage();
       drawPageHeader();
-      y = 102;
+      y = 114;
     }
 
     doc.rect(40, y, pageW, 18).fill(gb(grade));
@@ -322,7 +327,7 @@ export async function generateClassListPDF(session: Session): Promise<Buffer> {
       if (y > doc.page.height - 60) {
         doc.addPage();
         drawPageHeader();
-        y = 102;
+        y = 114;
         y = drawTableHeader(y);
       }
       const location = e.building
@@ -382,7 +387,7 @@ export async function generateSignaturePDF(session: Session): Promise<Buffer> {
 
     drawHeader(doc, pageW, session.config.institutionName || 'Distribuição de Salas de Prova', subtitle);
 
-    const iy = 102;
+    const iy = 114;
     doc.rect(40, iy, pageW, 24).fill('#e8edf4');
     const roomLabel = room.building
       ? `${room.roomName}  (Prédio ${room.building}${room.floor ? ' · ' + room.floor : ''})`
@@ -395,7 +400,7 @@ export async function generateSignaturePDF(session: Session): Promise<Buffer> {
         275, iy + 8, { width: pageW - 235, lineBreak: false }
       );
 
-    let y = drawRoomTableHeader(136);
+    let y = drawRoomTableHeader(148);
 
     const sorted = [...room.allocations].sort((a, b) =>
       a.rowNumber !== b.rowNumber ? a.rowNumber - b.rowNumber : a.seatNumber - b.seatNumber
