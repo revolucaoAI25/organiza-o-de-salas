@@ -119,11 +119,37 @@ export function distribute(
   const rooms: Room[] = [];
 
   if (config.selectedRooms && config.selectedRooms.length > 0) {
-    // Catalog mode: fill each selected room up to its individual capacity
+    // Catalog mode: use only the minimum number of rooms needed, then distribute
+    // proportionally so no room ends up with far fewer students than the others.
+    const total = interleaved.length;
+
+    // Step 1: find the minimum prefix of selected rooms whose combined capacity >= total
+    let cumCap = 0;
+    let roomCount = 0;
+    for (const room of config.selectedRooms) {
+      cumCap += room.capacity;
+      roomCount++;
+      if (cumCap >= total) break;
+    }
+    const activeRooms = config.selectedRooms.slice(0, roomCount);
+    const totalActiveCap = activeRooms.reduce((s, r) => s + r.capacity, 0);
+
+    // Step 2: proportional allocation using the largest-remainder method.
+    // Each room gets floor(total * room.capacity / totalActiveCap); the
+    // remaining students (due to rounding) go to the rooms with the largest
+    // fractional remainder, one each.
+    const rawShares = activeRooms.map(r => (total * r.capacity) / totalActiveCap);
+    const floorShares = rawShares.map(x => Math.floor(x));
+    const remainder = total - floorShares.reduce((s, c) => s + c, 0);
+    rawShares
+      .map((x, i) => ({ i, frac: x - floorShares[i] }))
+      .sort((a, b) => b.frac - a.frac)
+      .slice(0, remainder)
+      .forEach(({ i }) => floorShares[i]++);
+
     let offset = 0;
-    config.selectedRooms.forEach((roomDef, i) => {
-      if (offset >= interleaved.length) return;
-      const chunk = interleaved.slice(offset, offset + roomDef.capacity);
+    activeRooms.forEach((roomDef, i) => {
+      const chunk = interleaved.slice(offset, offset + floorShares[i]);
       offset += chunk.length;
       const roomStudents = reduceAdjacentSameClass(chunk, seatsPerRow);
       rooms.push(buildRoom(roomStudents, i + 1, roomDef.name, seatsPerRow, roomDef.building, roomDef.floor));
