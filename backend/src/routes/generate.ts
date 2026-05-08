@@ -15,16 +15,22 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
+    const selectedRooms = Array.isArray(body.config?.selectedRooms) && body.config.selectedRooms.length > 0
+      ? body.config.selectedRooms
+      : undefined;
+
     const config = {
       sessionName: body.config?.sessionName ?? 'Aplicação de Prova',
       examDate: body.config?.examDate ?? new Date().toLocaleDateString('pt-BR'),
       institutionName: body.config?.institutionName ?? '',
-      maxPerRoom: Number(body.config?.maxPerRoom) || 40,
+      maxPerRoom: Number(body.config?.maxPerRoom) || 60,
       rows: Number(body.config?.rows) || 6,
       seatsPerRow: Number(body.config?.seatsPerRow) || 10,
+      selectedRooms,
     };
 
-    if (config.rows * config.seatsPerRow < config.maxPerRoom) {
+    // In catalog mode individual room capacities are used, layout check is irrelevant
+    if (!selectedRooms && config.rows * config.seatsPerRow < config.maxPerRoom) {
       res.status(400).json({
         error: `Configuração inválida: ${config.rows} fileiras × ${config.seatsPerRow} carteiras = ${config.rows * config.seatsPerRow} lugares, mas máximo por sala é ${config.maxPerRoom}.`,
       });
