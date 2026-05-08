@@ -37,11 +37,10 @@ function drawHeader(
   const hasLogo = fs.existsSync(LOGO_PATH);
   doc.rect(40, 40, pageW, HEADER_H).fill('#1e3a5f');
   if (hasLogo) {
-    // Render logo on the left; logo image may include wordmark so keep it compact
-    try { doc.image(LOGO_PATH, 44, 44, { height: 56, fit: [56, 56] }); } catch { /* ignore */ }
+    try { doc.image(LOGO_PATH, 44, 44, { fit: [60, 60] }); } catch { /* ignore */ }
   }
-  const textX = hasLogo ? 108 : 50;
-  const textW = pageW - (hasLogo ? 68 : 20);
+  const textX = hasLogo ? 175 : 50;
+  const textW = pageW - (hasLogo ? 135 : 20);
   // Strip any embedded newlines that would overflow the fixed-height header
   const cleanName = (institutionName || 'Distribuição de Salas de Prova').replace(/[\r\n]+/g, ' ').trim();
   doc.fillColor('white').fontSize(13).font('Helvetica-Bold')
