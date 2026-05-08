@@ -56,11 +56,9 @@ function reduceAdjacentSameClass(
   for (let pass = 0; pass < maxSwaps; pass++) {
     let swapped = false;
     for (let i = 0; i < arr.length - 1; i++) {
-      // Only check within the same row
       const sameRow = Math.floor(i / seatsPerRow) === Math.floor((i + 1) / seatsPerRow);
       if (!sameRow) continue;
       if (arr[i].classCode && arr[i].classCode === arr[i + 1].classCode) {
-        // Find a candidate to swap arr[i+1] with (different row or different class)
         let swapIdx = -1;
         for (let j = i + 2; j < arr.length; j++) {
           if (arr[j].classCode !== arr[i].classCode) {
@@ -80,23 +78,36 @@ function reduceAdjacentSameClass(
 }
 
 /**
- * Assigns row/seat positions to students, avoiding a near-empty last row.
+ * Assigns row/seat positions, respecting the configured layout while avoiding
+ * near-empty rows.
  *
- * Rule: if the remainder (students that would spill into a new row) is ≤ 3,
- * absorb them into the existing rows (slightly exceeding seatsPerRow) instead
- * of creating a lonely last row. If remainder > 3 a new row is created, but
- * students are distributed evenly across ALL rows so no row ends up with
- * just 1-2 students.
+ * Rules (priority order):
+ *  1. Use at least configRows rows — the layout the user set.
+ *  2. Add extra rows only when students overflow configRows × seatsPerRow:
+ *       - Overflow ≤ 3: absorb into existing rows (tiny seatsPerRow overrun).
+ *       - Overflow > 3: add one more row, distribute evenly across all.
+ *  3. Use fewer than configRows only if spreading across all rows would give
+ *     < 3 students per row (avoids rows with just 1-2 students).
+ *
+ * Students are always spread evenly across the chosen number of rows.
  */
-function assignSeats(students: Student[], seatsPerRow: number): Allocation[] {
+function assignSeats(students: Student[], seatsPerRow: number, configRows: number): Allocation[] {
   const N = students.length;
   if (N === 0) return [];
 
+  // Natural rows needed given seatsPerRow (with near-empty-last-row rule)
   const baseRows = Math.max(1, Math.floor(N / seatsPerRow));
   const remainder = N % seatsPerRow;
-  const targetRows = (remainder === 0 || remainder <= 3) ? baseRows : baseRows + 1;
+  const naturalRows = (remainder === 0 || remainder <= 3) ? baseRows : baseRows + 1;
 
-  // Even distribution across targetRows via largest-remainder method
+  // Prefer configRows as minimum; cap only when rows would have < 3 students
+  const maxRowsByDensity = Math.max(1, Math.floor(N / 3));
+  const targetRows = Math.min(
+    Math.max(configRows, naturalRows),
+    maxRowsByDensity,
+  );
+
+  // Even distribution via largest-remainder method
   const raw = N / targetRows;
   const perRow = Array.from({ length: targetRows }, () => Math.floor(raw));
   let leftover = N - perRow.reduce((s, c) => s + c, 0);
@@ -125,10 +136,11 @@ function buildRoom(
   roomNumber: number,
   roomName: string,
   seatsPerRow: number,
+  configRows: number,
   building?: string,
   floor?: string,
 ): Room {
-  const allocations = assignSeats(roomStudents, seatsPerRow);
+  const allocations = assignSeats(roomStudents, seatsPerRow, configRows);
 
   const stats = {
     grade1: roomStudents.filter(s => s.grade === '1ª SÉRIE').length,
@@ -143,7 +155,7 @@ export function distribute(
   students: Student[],
   config: SessionConfig
 ): Room[] {
-  const { maxPerRoom, rows: _rows, seatsPerRow } = config;
+  const { maxPerRoom, rows, seatsPerRow } = config;
 
   const g1 = shuffle(students.filter(s => s.grade === '1ª SÉRIE'));
   const g2 = shuffle(students.filter(s => s.grade === '2ª SÉRIE'));
@@ -153,11 +165,10 @@ export function distribute(
   const rooms: Room[] = [];
 
   if (config.selectedRooms && config.selectedRooms.length > 0) {
-    // Catalog mode: use only the minimum number of rooms needed, then distribute
-    // proportionally so no room ends up with far fewer students than the others.
+    // Catalog mode: use minimum rooms needed, distribute proportionally
     const total = interleaved.length;
 
-    // Step 1: find the minimum prefix of selected rooms whose combined capacity >= total
+    // Find the minimum prefix of selected rooms whose combined capacity >= total
     let cumCap = 0;
     let roomCount = 0;
     for (const room of config.selectedRooms) {
@@ -168,10 +179,7 @@ export function distribute(
     const activeRooms = config.selectedRooms.slice(0, roomCount);
     const totalActiveCap = activeRooms.reduce((s, r) => s + r.capacity, 0);
 
-    // Step 2: proportional allocation using the largest-remainder method.
-    // Each room gets floor(total * room.capacity / totalActiveCap); the
-    // remaining students (due to rounding) go to the rooms with the largest
-    // fractional remainder, one each.
+    // Proportional allocation via largest-remainder method
     const rawShares = activeRooms.map(r => (total * r.capacity) / totalActiveCap);
     const floorShares = rawShares.map(x => Math.floor(x));
     const remainder = total - floorShares.reduce((s, c) => s + c, 0);
@@ -186,7 +194,7 @@ export function distribute(
       const chunk = interleaved.slice(offset, offset + floorShares[i]);
       offset += chunk.length;
       const roomStudents = reduceAdjacentSameClass(chunk, seatsPerRow);
-      rooms.push(buildRoom(roomStudents, i + 1, roomDef.name, seatsPerRow, roomDef.building, roomDef.floor));
+      rooms.push(buildRoom(roomStudents, i + 1, roomDef.name, seatsPerRow, rows, roomDef.building, roomDef.floor));
     });
   } else {
     // Auto mode: split into equal chunks of maxPerRoom
@@ -194,7 +202,7 @@ export function distribute(
       const chunk = interleaved.slice(i, i + maxPerRoom);
       const roomNumber = Math.floor(i / maxPerRoom) + 1;
       const roomStudents = reduceAdjacentSameClass(chunk, seatsPerRow);
-      rooms.push(buildRoom(roomStudents, roomNumber, `Sala ${roomNumber.toString().padStart(2, '0')}`, seatsPerRow));
+      rooms.push(buildRoom(roomStudents, roomNumber, `Sala ${roomNumber.toString().padStart(2, '0')}`, seatsPerRow, rows));
     }
   }
 
