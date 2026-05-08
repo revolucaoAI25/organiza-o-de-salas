@@ -79,47 +79,63 @@ function reduceAdjacentSameClass(
   return arr;
 }
 
+function buildRoom(
+  roomStudents: Student[],
+  roomNumber: number,
+  roomName: string,
+  seatsPerRow: number,
+  building?: string,
+  floor?: string,
+): Room {
+  const allocations: Allocation[] = roomStudents.map((student, idx) => ({
+    studentName: student.name,
+    studentId: student.studentId,
+    grade: student.grade,
+    classCode: student.classCode,
+    rowNumber: Math.floor(idx / seatsPerRow) + 1,
+    seatNumber: (idx % seatsPerRow) + 1,
+  }));
+
+  const stats = {
+    grade1: roomStudents.filter(s => s.grade === '1ª SÉRIE').length,
+    grade2: roomStudents.filter(s => s.grade === '2ª SÉRIE').length,
+    grade3: roomStudents.filter(s => s.grade === '3ª SÉRIE').length,
+  };
+
+  return { roomNumber, roomName, building, floor, allocations, stats };
+}
+
 export function distribute(
   students: Student[],
   config: SessionConfig
 ): Room[] {
-  const { maxPerRoom, rows, seatsPerRow } = config;
+  const { maxPerRoom, rows: _rows, seatsPerRow } = config;
 
   const g1 = shuffle(students.filter(s => s.grade === '1ª SÉRIE'));
   const g2 = shuffle(students.filter(s => s.grade === '2ª SÉRIE'));
   const g3 = shuffle(students.filter(s => s.grade === '3ª SÉRIE'));
 
   const interleaved = interleaveGrades(g1, g2, g3);
-
   const rooms: Room[] = [];
-  const chunkSize = maxPerRoom;
 
-  for (let i = 0; i < interleaved.length; i += chunkSize) {
-    const chunk = interleaved.slice(i, i + chunkSize);
-    const roomStudents = reduceAdjacentSameClass(chunk, seatsPerRow);
-    const roomNumber = Math.floor(i / chunkSize) + 1;
-
-    const allocations: Allocation[] = roomStudents.map((student, idx) => ({
-      studentName: student.name,
-      studentId: student.studentId,
-      grade: student.grade,
-      classCode: student.classCode,
-      rowNumber: Math.floor(idx / seatsPerRow) + 1,
-      seatNumber: (idx % seatsPerRow) + 1,
-    }));
-
-    const stats = {
-      grade1: roomStudents.filter(s => s.grade === '1ª SÉRIE').length,
-      grade2: roomStudents.filter(s => s.grade === '2ª SÉRIE').length,
-      grade3: roomStudents.filter(s => s.grade === '3ª SÉRIE').length,
-    };
-
-    rooms.push({
-      roomNumber,
-      roomName: `Sala ${roomNumber.toString().padStart(2, '0')}`,
-      allocations,
-      stats,
+  if (config.selectedRooms && config.selectedRooms.length > 0) {
+    // Catalog mode: fill each selected room up to its individual capacity
+    let offset = 0;
+    config.selectedRooms.forEach((roomDef, i) => {
+      if (offset >= interleaved.length) return;
+      const chunk = interleaved.slice(offset, offset + roomDef.capacity);
+      offset += chunk.length;
+      const roomStudents = reduceAdjacentSameClass(chunk, seatsPerRow);
+      rooms.push(buildRoom(roomStudents, i + 1, roomDef.name, seatsPerRow, roomDef.building, roomDef.floor));
     });
+  } else {
+    // Auto mode: split into equal chunks of maxPerRoom
+    for (let i = 0; i < interleaved.length; i += maxPerRoom) {
+      const chunk = interleaved.slice(i, i + maxPerRoom);
+      const roomNumber = Math.floor(i / maxPerRoom) + 1;
+      const roomStudents = reduceAdjacentSameClass(chunk, seatsPerRow);
+      rooms.push(buildRoom(roomStudents, roomNumber, `Sala ${roomNumber.toString().padStart(2, '0')}`, seatsPerRow));
+    }
   }
 
   return rooms;

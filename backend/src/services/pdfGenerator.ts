@@ -40,12 +40,15 @@ export async function generateListPDF(session: Session): Promise<Buffer> {
 
     const iy = 102;
     doc.rect(40, iy, pageW, 24).fill('#e8edf4');
+    const roomLabel = room.building
+      ? `${room.roomName}  (Prédio ${room.building}${room.floor ? ' · ' + room.floor : ''})`
+      : room.roomName;
     doc.fillColor('#1e3a5f').fontSize(11).font('Helvetica-Bold')
-      .text(room.roomName, 50, iy + 6, { width: 120 });
+      .text(roomLabel, 50, iy + 6, { width: 220 });
     doc.fillColor('#374151').fontSize(9).font('Helvetica')
       .text(
         `Total: ${room.allocations.length}   |   1ª: ${room.stats.grade1}   2ª: ${room.stats.grade2}   3ª: ${room.stats.grade3}`,
-        175, iy + 8, { width: pageW - 135 }
+        275, iy + 8, { width: pageW - 235 }
       );
 
     const TY = 136;
@@ -128,8 +131,11 @@ export async function generateMapPDF(
 
     // Header
     doc.rect(40, 40, pageW, 40).fill('#1e3a5f');
+    const mapRoomLabel = room.building
+      ? `Mapa de Sala — ${room.roomName}  (Prédio ${room.building}${room.floor ? ' · ' + room.floor : ''})`
+      : `Mapa de Sala — ${room.roomName}`;
     doc.fillColor('white').fontSize(12).font('Helvetica-Bold')
-      .text(`Mapa de Sala — ${room.roomName}`, 52, 47, { width: pageW - 20 });
+      .text(mapRoomLabel, 52, 47, { width: pageW - 20 });
     doc.fontSize(8.5).font('Helvetica')
       .text(
         `${session.config.sessionName}   ·   ${session.config.examDate}   ·   ${room.allocations.length} alunos   (1ª: ${room.stats.grade1}  2ª: ${room.stats.grade2}  3ª: ${room.stats.grade3})`,

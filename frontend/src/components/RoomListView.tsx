@@ -141,6 +141,11 @@ export default function RoomListView({ session: initialSession, onSessionUpdate 
                   <span className="text-amber-500 text-xs">●</span>
                 )}
               </div>
+              {(room.building || room.floor) && (
+                <div className="text-xs text-slate-400 mt-0.5 leading-tight">
+                  {room.building && `Préd. ${room.building}`}{room.building && room.floor && ' · '}{room.floor}
+                </div>
+              )}
               <div className="text-xs text-slate-500 mt-0.5">{room.allocations.length} alunos</div>
             </button>
           ))}
@@ -155,7 +160,14 @@ export default function RoomListView({ session: initialSession, onSessionUpdate 
             <div className="p-4 border-b border-slate-100">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-bold text-lg text-slate-900">{currentRoom.roomName}</h3>
+                  <h3 className="font-bold text-lg text-slate-900">
+                    {currentRoom.roomName}
+                    {(currentRoom.building || currentRoom.floor) && (
+                      <span className="ml-2 text-sm font-normal text-slate-500">
+                        {currentRoom.building && `Prédio ${currentRoom.building}`}{currentRoom.building && currentRoom.floor && ' · '}{currentRoom.floor}
+                      </span>
+                    )}
+                  </h3>
                   <div className="flex items-center gap-3 mt-1 text-sm">
                     <span className="text-slate-500">{currentRoom.allocations.length} alunos</span>
                     <GradeBar stats={currentRoom.stats} total={currentRoom.allocations.length} />

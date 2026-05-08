@@ -36,6 +36,8 @@ export interface RoomStats {
 export interface Room {
   roomNumber: number;
   roomName: string;
+  building?: string;
+  floor?: string;
   allocations: Allocation[];
   stats: RoomStats;
 }
@@ -47,6 +49,7 @@ export interface SessionConfig {
   maxPerRoom: number;
   rows: number;
   seatsPerRow: number;
+  selectedRooms?: import('./data/rooms').RoomDefinition[];
 }
 
 export interface Session {

@@ -35,11 +35,21 @@ export interface RoomStats {
   grade3: number;
 }
 
+export interface RoomDefinition {
+  id: string;
+  name: string;
+  building: string;
+  floor: string;
+  capacity: number;
+}
+
 export interface Room {
   id?: string;
   sessionId?: string;
   roomNumber: number;
   roomName: string;
+  building?: string;
+  floor?: string;
   allocations: Allocation[];
   stats: RoomStats;
 }
@@ -51,6 +61,7 @@ export interface SessionConfig {
   maxPerRoom: number;
   rows: number;
   seatsPerRow: number;
+  selectedRooms?: RoomDefinition[];
 }
 
 export interface Session {

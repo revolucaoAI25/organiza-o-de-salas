@@ -15,14 +15,27 @@ export async function generateXLSX(session: Session): Promise<Buffer> {
   const rooms = session.rooms ?? [];
 
   // ── Summary sheet ─────────────────────────────────────────────────────
+  const hasBuildingInfo = rooms.some(r => r.building);
   const summary = wb.addWorksheet('Resumo');
-  summary.columns = [
-    { header: 'Sala', key: 'room', width: 12 },
-    { header: 'Total', key: 'total', width: 10 },
-    { header: '1ª Série', key: 'g1', width: 12 },
-    { header: '2ª Série', key: 'g2', width: 12 },
-    { header: '3ª Série', key: 'g3', width: 12 },
-  ];
+  if (hasBuildingInfo) {
+    summary.columns = [
+      { header: 'Sala', key: 'room', width: 12 },
+      { header: 'Prédio', key: 'building', width: 10 },
+      { header: 'Andar', key: 'floor', width: 14 },
+      { header: 'Total', key: 'total', width: 10 },
+      { header: '1ª Série', key: 'g1', width: 12 },
+      { header: '2ª Série', key: 'g2', width: 12 },
+      { header: '3ª Série', key: 'g3', width: 12 },
+    ];
+  } else {
+    summary.columns = [
+      { header: 'Sala', key: 'room', width: 12 },
+      { header: 'Total', key: 'total', width: 10 },
+      { header: '1ª Série', key: 'g1', width: 12 },
+      { header: '2ª Série', key: 'g2', width: 12 },
+      { header: '3ª Série', key: 'g3', width: 12 },
+    ];
+  }
 
   summary.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
   summary.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
@@ -30,6 +43,7 @@ export async function generateXLSX(session: Session): Promise<Buffer> {
   rooms.forEach(room => {
     summary.addRow({
       room: room.roomName,
+      ...(hasBuildingInfo ? { building: room.building ?? '', floor: room.floor ?? '' } : {}),
       total: room.allocations.length,
       g1: room.stats.grade1,
       g2: room.stats.grade2,

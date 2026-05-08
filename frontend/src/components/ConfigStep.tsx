@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { Settings, Loader2, AlertCircle, CalendarDays, Users, Rows, LayoutGrid } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Settings, Loader2, AlertCircle, CalendarDays, Users, Rows, LayoutGrid, Building2, ChevronDown, ChevronRight } from 'lucide-react';
 import { ParseResult, SessionConfig, Student } from '../types';
 import { generateDistribution } from '../services/api';
 import { Session } from '../types';
+import { ROOM_CATALOG, BUILDINGS, getBuildingRooms, getFloors, floorLabel, RoomDefinition } from '../data/rooms';
 
 interface Props {
   students: Student[];
@@ -15,7 +16,7 @@ const defaultConfig: SessionConfig = {
   sessionName: '',
   examDate: new Date().toLocaleDateString('pt-BR'),
   institutionName: '',
-  maxPerRoom: 40,
+  maxPerRoom: 60,
   rows: 6,
   seatsPerRow: 10,
 };
@@ -25,12 +26,73 @@ export default function ConfigStep({ students, parseResult, onBack, onGenerated 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Catalog mode state
+  const [catalogMode, setCatalogMode] = useState(false);
+  const [selectedRoomIds, setSelectedRoomIds] = useState<Set<string>>(new Set());
+  const [expandedBuildings, setExpandedBuildings] = useState<Set<string>>(new Set(['A']));
+
+  // Derived: selected room definitions
+  const selectedRooms = useMemo(
+    () => ROOM_CATALOG.filter(r => selectedRoomIds.has(r.id)),
+    [selectedRoomIds]
+  );
+  const catalogTotalCapacity = selectedRooms.reduce((s, r) => s + r.capacity, 0);
+
+  // Auto mode derived values
   const totalSeats = config.rows * config.seatsPerRow;
-  const roomsNeeded = Math.ceil(students.length / config.maxPerRoom);
-  const capacityOk = totalSeats >= config.maxPerRoom;
+  const roomsNeeded = catalogMode
+    ? selectedRooms.length
+    : Math.ceil(students.length / config.maxPerRoom);
+  const capacityOk = catalogMode
+    ? selectedRooms.length > 0
+    : totalSeats >= config.maxPerRoom;
 
   function set<K extends keyof SessionConfig>(key: K, value: SessionConfig[K]) {
     setConfig(prev => ({ ...prev, [key]: value }));
+  }
+
+  function toggleBuilding(b: string) {
+    setExpandedBuildings(prev => {
+      const next = new Set(prev);
+      if (next.has(b)) next.delete(b); else next.add(b);
+      return next;
+    });
+  }
+
+  function toggleRoom(room: RoomDefinition) {
+    setSelectedRoomIds(prev => {
+      const next = new Set(prev);
+      if (next.has(room.id)) next.delete(room.id); else next.add(room.id);
+      return next;
+    });
+  }
+
+  function selectFloor(building: string, floor: string) {
+    const ids = getBuildingRooms(building).filter(r => r.floor === floor).map(r => r.id);
+    setSelectedRoomIds(prev => {
+      const next = new Set(prev);
+      ids.forEach(id => next.add(id));
+      return next;
+    });
+  }
+
+  function deselectFloor(building: string, floor: string) {
+    const ids = new Set(getBuildingRooms(building).filter(r => r.floor === floor).map(r => r.id));
+    setSelectedRoomIds(prev => {
+      const next = new Set(prev);
+      ids.forEach(id => next.delete(id));
+      return next;
+    });
+  }
+
+  function selectBuilding(building: string) {
+    const ids = getBuildingRooms(building).map(r => r.id);
+    setSelectedRoomIds(prev => { const next = new Set(prev); ids.forEach(id => next.add(id)); return next; });
+  }
+
+  function deselectBuilding(building: string) {
+    const ids = new Set(getBuildingRooms(building).map(r => r.id));
+    setSelectedRoomIds(prev => { const next = new Set(prev); ids.forEach(id => next.delete(id)); return next; });
   }
 
   async function handleGenerate() {
@@ -38,14 +100,22 @@ export default function ConfigStep({ students, parseResult, onBack, onGenerated 
       setError('Informe o nome da aplicação/prova.');
       return;
     }
-    if (!capacityOk) {
+    if (catalogMode && selectedRooms.length === 0) {
+      setError('Selecione pelo menos uma sala no catálogo.');
+      return;
+    }
+    if (!catalogMode && !capacityOk) {
       setError(`Fileiras × Carteiras (${totalSeats}) deve ser ≥ máximo por sala (${config.maxPerRoom}).`);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const session = await generateDistribution(students, config);
+      const finalConfig: SessionConfig = {
+        ...config,
+        selectedRooms: catalogMode ? selectedRooms : undefined,
+      };
+      const session = await generateDistribution(students, finalConfig);
       onGenerated(session);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao gerar distribuição.');
@@ -102,60 +172,105 @@ export default function ConfigStep({ students, parseResult, onBack, onGenerated 
           </div>
         </Section>
 
-        {/* Room settings */}
-        <Section icon={<Users className="w-4 h-4" />} title="Capacidade das Salas">
+        {/* Room mode toggle */}
+        <Section icon={<Building2 className="w-4 h-4" />} title="Seleção de Salas">
           <div className="space-y-4">
+            {/* Mode tabs */}
+            <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 gap-0.5">
+              <button
+                type="button"
+                onClick={() => setCatalogMode(false)}
+                className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
+                  !catalogMode ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Automático
+              </button>
+              <button
+                type="button"
+                onClick={() => setCatalogMode(true)}
+                className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
+                  catalogMode ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Selecionar salas
+              </button>
+            </div>
+
+            {/* Auto mode: max per room slider */}
+            {!catalogMode && (
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="label mb-0">
+                    <Users className="w-3.5 h-3.5 inline mr-1" />
+                    Máximo por sala
+                  </label>
+                  <span className="text-lg font-bold text-blue-600">{config.maxPerRoom}</span>
+                </div>
+                <input
+                  type="range"
+                  min={10} max={60} step={1}
+                  value={config.maxPerRoom}
+                  onChange={e => set('maxPerRoom', Number(e.target.value))}
+                  className="w-full accent-blue-600"
+                />
+                <div className="flex justify-between text-xs text-slate-400 mt-0.5">
+                  <span>10</span>
+                  <span>60</span>
+                </div>
+              </div>
+            )}
+
+            {/* Catalog mode: building/floor/room selector */}
+            {catalogMode && (
+              <CatalogSelector
+                selectedRoomIds={selectedRoomIds}
+                expandedBuildings={expandedBuildings}
+                onToggleBuilding={toggleBuilding}
+                onToggleRoom={toggleRoom}
+                onSelectFloor={selectFloor}
+                onDeselectFloor={deselectFloor}
+                onSelectBuilding={selectBuilding}
+                onDeselectBuilding={deselectBuilding}
+              />
+            )}
+          </div>
+        </Section>
+
+        {/* Layout */}
+        <Section icon={<Rows className="w-4 h-4" />} title="Layout da Sala">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="label mb-0">Máximo por sala</label>
-                <span className="text-lg font-bold text-blue-600">{config.maxPerRoom}</span>
+                <label className="label mb-0">
+                  <Rows className="w-3.5 h-3.5 inline mr-1" />
+                  Fileiras
+                </label>
+                <span className="font-bold text-slate-700">{config.rows}</span>
               </div>
               <input
                 type="range"
-                min={10} max={45} step={1}
-                value={config.maxPerRoom}
-                onChange={e => set('maxPerRoom', Number(e.target.value))}
+                min={1} max={12} step={1}
+                value={config.rows}
+                onChange={e => set('rows', Number(e.target.value))}
                 className="w-full accent-blue-600"
               />
-              <div className="flex justify-between text-xs text-slate-400 mt-0.5">
-                <span>10</span>
-                <span>45</span>
-              </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="label mb-0">
-                    <Rows className="w-3.5 h-3.5 inline mr-1" />
-                    Fileiras
-                  </label>
-                  <span className="font-bold text-slate-700">{config.rows}</span>
-                </div>
-                <input
-                  type="range"
-                  min={1} max={12} step={1}
-                  value={config.rows}
-                  onChange={e => set('rows', Number(e.target.value))}
-                  className="w-full accent-blue-600"
-                />
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="label mb-0">
+                  <LayoutGrid className="w-3.5 h-3.5 inline mr-1" />
+                  Carteiras/fileira
+                </label>
+                <span className="font-bold text-slate-700">{config.seatsPerRow}</span>
               </div>
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="label mb-0">
-                    <LayoutGrid className="w-3.5 h-3.5 inline mr-1" />
-                    Carteiras/fileira
-                  </label>
-                  <span className="font-bold text-slate-700">{config.seatsPerRow}</span>
-                </div>
-                <input
-                  type="range"
-                  min={1} max={15} step={1}
-                  value={config.seatsPerRow}
-                  onChange={e => set('seatsPerRow', Number(e.target.value))}
-                  className="w-full accent-blue-600"
-                />
-              </div>
+              <input
+                type="range"
+                min={1} max={15} step={1}
+                value={config.seatsPerRow}
+                onChange={e => set('seatsPerRow', Number(e.target.value))}
+                className="w-full accent-blue-600"
+              />
             </div>
           </div>
         </Section>
@@ -168,13 +283,25 @@ export default function ConfigStep({ students, parseResult, onBack, onGenerated 
           <div className="grid grid-cols-2 gap-2 text-slate-600">
             <span>Salas necessárias:</span>
             <span className="font-bold text-slate-800">{roomsNeeded}</span>
-            <span>Capacidade por sala:</span>
-            <span className={`font-bold ${capacityOk ? 'text-slate-800' : 'text-red-600'}`}>
-              {totalSeats} ({config.rows}×{config.seatsPerRow})
-            </span>
+            {catalogMode ? (
+              <>
+                <span>Capacidade total das salas:</span>
+                <span className={`font-bold ${catalogTotalCapacity >= students.length ? 'text-slate-800' : 'text-amber-600'}`}>
+                  {catalogTotalCapacity} vagas
+                  {catalogTotalCapacity < students.length && ` ⚠ faltam ${students.length - catalogTotalCapacity}`}
+                </span>
+              </>
+            ) : (
+              <>
+                <span>Capacidade por sala:</span>
+                <span className={`font-bold ${capacityOk ? 'text-slate-800' : 'text-red-600'}`}>
+                  {totalSeats} ({config.rows}×{config.seatsPerRow})
+                </span>
+              </>
+            )}
             <span>Alunos por série/sala:</span>
             <span className="font-bold text-slate-800">
-              ~{Math.round(parseResult.totals.grade1 / roomsNeeded)} · ~{Math.round(parseResult.totals.grade2 / roomsNeeded)} · ~{Math.round(parseResult.totals.grade3 / roomsNeeded)}
+              ~{roomsNeeded > 0 ? Math.round(parseResult.totals.grade1 / roomsNeeded) : 0} · ~{roomsNeeded > 0 ? Math.round(parseResult.totals.grade2 / roomsNeeded) : 0} · ~{roomsNeeded > 0 ? Math.round(parseResult.totals.grade3 / roomsNeeded) : 0}
             </span>
           </div>
         </div>
@@ -198,6 +325,140 @@ export default function ConfigStep({ students, parseResult, onBack, onGenerated 
             )}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Catalog selector sub-component ────────────────────────────────────────────
+
+interface CatalogProps {
+  selectedRoomIds: Set<string>;
+  expandedBuildings: Set<string>;
+  onToggleBuilding: (b: string) => void;
+  onToggleRoom: (r: RoomDefinition) => void;
+  onSelectFloor: (building: string, floor: string) => void;
+  onDeselectFloor: (building: string, floor: string) => void;
+  onSelectBuilding: (building: string) => void;
+  onDeselectBuilding: (building: string) => void;
+}
+
+function CatalogSelector({
+  selectedRoomIds,
+  expandedBuildings,
+  onToggleBuilding,
+  onToggleRoom,
+  onSelectFloor,
+  onDeselectFloor,
+  onSelectBuilding,
+  onDeselectBuilding,
+}: CatalogProps) {
+  const total = selectedRoomIds.size;
+  const totalCap = ROOM_CATALOG.filter(r => selectedRoomIds.has(r.id)).reduce((s, r) => s + r.capacity, 0);
+
+  return (
+    <div className="space-y-2">
+      {/* Summary bar */}
+      <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+        <span>{total === 0 ? 'Nenhuma sala selecionada' : `${total} sala${total !== 1 ? 's' : ''} · ${totalCap} vagas`}</span>
+        <button
+          type="button"
+          onClick={() => {
+            if (total === ROOM_CATALOG.length) {
+              BUILDINGS.forEach(b => onDeselectBuilding(b));
+            } else {
+              BUILDINGS.forEach(b => onSelectBuilding(b));
+            }
+          }}
+          className="text-blue-600 hover:underline"
+        >
+          {total === ROOM_CATALOG.length ? 'Desmarcar tudo' : 'Selecionar tudo'}
+        </button>
+      </div>
+
+      {/* Building list */}
+      <div className="border border-slate-200 rounded-lg overflow-hidden divide-y divide-slate-100">
+        {BUILDINGS.map(building => {
+          const buildingRooms = getBuildingRooms(building);
+          const floors = getFloors(building);
+          const selectedInBuilding = buildingRooms.filter(r => selectedRoomIds.has(r.id)).length;
+          const expanded = expandedBuildings.has(building);
+          const allSelected = selectedInBuilding === buildingRooms.length;
+
+          return (
+            <div key={building}>
+              {/* Building header */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 cursor-pointer select-none"
+                onClick={() => onToggleBuilding(building)}>
+                <span className="text-slate-400 w-3 shrink-0">
+                  {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                </span>
+                <span className="font-semibold text-sm text-slate-700 flex-1">Prédio {building}</span>
+                <span className="text-xs text-slate-400">
+                  {selectedInBuilding}/{buildingRooms.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); allSelected ? onDeselectBuilding(building) : onSelectBuilding(building); }}
+                  className="text-xs text-blue-600 hover:underline ml-1 whitespace-nowrap"
+                >
+                  {allSelected ? 'Limpar' : 'Todos'}
+                </button>
+              </div>
+
+              {/* Floors */}
+              {expanded && floors.map(floor => {
+                const floorRooms = buildingRooms.filter(r => r.floor === floor);
+                const selectedInFloor = floorRooms.filter(r => selectedRoomIds.has(r.id)).length;
+                const allFloorSelected = selectedInFloor === floorRooms.length;
+
+                return (
+                  <div key={`${building}-${floor}`} className="px-3 py-2 space-y-1.5">
+                    {/* Floor label + quick select */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                        {floorLabel(floor, building)}
+                        <span className="ml-1 font-normal">({selectedInFloor}/{floorRooms.length})</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => allFloorSelected ? onDeselectFloor(building, floor) : onSelectFloor(building, floor)}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        {allFloorSelected ? 'Limpar' : 'Todos'}
+                      </button>
+                    </div>
+
+                    {/* Room chips */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {floorRooms.map(room => {
+                        const checked = selectedRoomIds.has(room.id);
+                        return (
+                          <button
+                            key={room.id}
+                            type="button"
+                            onClick={() => onToggleRoom(room)}
+                            title={`${room.name} — ${room.capacity} vagas`}
+                            className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
+                              checked
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400'
+                            }`}
+                          >
+                            {room.name}
+                            <span className={`ml-1 ${checked ? 'text-blue-200' : 'text-slate-400'}`}>
+                              {room.capacity}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

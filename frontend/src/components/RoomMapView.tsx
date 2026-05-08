@@ -222,7 +222,7 @@ export default function RoomMapView({ session: initialSession, onSessionUpdate }
                     : '',
                 ].join(' ')}
               >
-                {String(r.roomNumber).padStart(2, '0')}
+                {r.roomName}
                 {selected?.roomNumber === r.roomNumber && r.roomNumber !== selectedRoom && (
                   <span className="ml-1 text-amber-500">●</span>
                 )}
@@ -304,8 +304,13 @@ export default function RoomMapView({ session: initialSession, onSessionUpdate }
       )}
 
       {/* Room stats */}
-      <div className="flex items-center gap-3 text-sm">
+      <div className="flex items-center gap-3 text-sm flex-wrap">
         <span className="font-bold text-slate-900">{room.roomName}</span>
+        {(room.building || room.floor) && (
+          <span className="text-slate-400 text-xs">
+            {room.building && `Prédio ${room.building}`}{room.building && room.floor && ' · '}{room.floor}
+          </span>
+        )}
         <span className="text-slate-500">{room.allocations.length} alunos</span>
         <Legend color="bg-blue-500"   label={`1ª: ${room.stats.grade1}`} />
         <Legend color="bg-green-500"  label={`2ª: ${room.stats.grade2}`} />
