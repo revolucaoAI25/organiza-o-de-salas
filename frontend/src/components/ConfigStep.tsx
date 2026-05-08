@@ -31,17 +31,31 @@ export default function ConfigStep({ students, parseResult, onBack, onGenerated 
   const [selectedRoomIds, setSelectedRoomIds] = useState<Set<string>>(new Set());
   const [expandedBuildings, setExpandedBuildings] = useState<Set<string>>(new Set(['A']));
 
-  // Derived: selected room definitions
+  // Derived: selected room definitions (in catalog order)
   const selectedRooms = useMemo(
     () => ROOM_CATALOG.filter(r => selectedRoomIds.has(r.id)),
     [selectedRoomIds]
   );
-  const catalogTotalCapacity = selectedRooms.reduce((s, r) => s + r.capacity, 0);
+
+  // Mirror backend logic: minimum prefix of rooms needed to cover all students
+  const activeRooms = useMemo(() => {
+    if (!catalogMode || selectedRooms.length === 0) return selectedRooms;
+    let cap = 0;
+    const needed: typeof selectedRooms = [];
+    for (const room of selectedRooms) {
+      cap += room.capacity;
+      needed.push(room);
+      if (cap >= students.length) break;
+    }
+    return needed;
+  }, [catalogMode, selectedRooms, students.length]);
+
+  const catalogTotalCapacity = activeRooms.reduce((s, r) => s + r.capacity, 0);
 
   // Auto mode derived values
   const totalSeats = config.rows * config.seatsPerRow;
   const roomsNeeded = catalogMode
-    ? selectedRooms.length
+    ? activeRooms.length
     : Math.ceil(students.length / config.maxPerRoom);
   const capacityOk = catalogMode
     ? selectedRooms.length > 0
@@ -281,8 +295,13 @@ export default function ConfigStep({ students, parseResult, onBack, onGenerated 
             Estimativa de distribuição
           </div>
           <div className="grid grid-cols-2 gap-2 text-slate-600">
-            <span>Salas necessárias:</span>
-            <span className="font-bold text-slate-800">{roomsNeeded}</span>
+            <span>Salas utilizadas:</span>
+            <span className="font-bold text-slate-800">
+              {roomsNeeded}
+              {catalogMode && selectedRooms.length > activeRooms.length && (
+                <span className="ml-1 text-xs font-normal text-slate-400">de {selectedRooms.length} selecionadas</span>
+              )}
+            </span>
             {catalogMode ? (
               <>
                 <span>Capacidade total das salas:</span>
