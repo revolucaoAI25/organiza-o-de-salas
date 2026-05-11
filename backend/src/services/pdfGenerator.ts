@@ -37,7 +37,7 @@ function drawHeader(
   const hasLogo = fs.existsSync(LOGO_PATH);
   doc.rect(40, 40, pageW, HEADER_H).fill('#1e3a5f');
   if (hasLogo) {
-    try { doc.image(LOGO_PATH, 44, 44, { fit: [60, 60] }); } catch { /* ignore */ }
+    try { doc.image(LOGO_PATH, 44, 44, { fit: [120, 60] }); } catch { /* ignore */ }
   }
   const textX = hasLogo ? 175 : 50;
   const textW = pageW - (hasLogo ? 135 : 20);
