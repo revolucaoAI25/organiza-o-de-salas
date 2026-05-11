@@ -154,9 +154,9 @@ export async function generateMapPDF(
     const hasLogo = fs.existsSync(LOGO_PATH);
     doc.rect(40, 40, pageW, 40).fill('#1e3a5f');
     if (hasLogo) {
-      try { doc.image(LOGO_PATH, 46, 42, { height: 36, fit: [44, 36] }); } catch { /* ignore */ }
+      try { doc.image(LOGO_PATH, 46, 42, { fit: [80, 36] }); } catch { /* ignore */ }
     }
-    const mapTX = hasLogo ? 98 : 52;
+    const mapTX = hasLogo ? 135 : 52;
     const mapRoomLabel = room.building
       ? `Mapa de Sala — ${room.roomName}  (Prédio ${room.building}${room.floor ? ' · ' + room.floor : ''})`
       : `Mapa de Sala — ${room.roomName}`;
