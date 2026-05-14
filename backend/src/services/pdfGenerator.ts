@@ -360,7 +360,7 @@ export async function generateSignaturePDF(session: Session): Promise<Buffer> {
   const buf = docToBuffer(doc);
   const rooms = session.rooms ?? [];
   const pageW = doc.page.width - 80;
-  const ROW_H = 22;
+  const ROW_H = 28;
 
   // Layout: Nº | Lugar | Turma | Nome | Assinatura
   const C_NUM    = 50;  const W_NUM    = 24;
@@ -369,13 +369,6 @@ export async function generateSignaturePDF(session: Session): Promise<Buffer> {
   const C_NOME   = 180; const W_NOME   = 148;
   const C_SIG    = 334;
   const W_SIG    = pageW - (C_SIG - 40) - 10;
-
-  function fitText(text: string, maxWidth: number): string {
-    if (doc.widthOfString(text) <= maxWidth) return text;
-    let t = text;
-    while (t.length > 1 && doc.widthOfString(t + '…') > maxWidth) t = t.slice(0, -1);
-    return t + '…';
-  }
 
   const subtitle = `${session.config.sessionName}   ·   ${session.config.examDate}   ·   Lista de Presença`;
 
@@ -431,7 +424,7 @@ export async function generateSignaturePDF(session: Session): Promise<Buffer> {
       doc.fillColor('#374151').fontSize(7.5).font('Helvetica')
         .text(alloc.classCode, C_TURMA, ty, { width: W_TURMA, lineBreak: false });
       doc.fillColor('#111827').fontSize(8).font('Helvetica-Bold')
-        .text(fitText(alloc.studentName, W_NOME), C_NOME, ty, { width: W_NOME, lineBreak: false });
+        .text(alloc.studentName, C_NOME, ty, { width: W_NOME, lineBreak: true });
 
       // Signature line at 70% height of the row
       const lineY = y + ROW_H - 6;
