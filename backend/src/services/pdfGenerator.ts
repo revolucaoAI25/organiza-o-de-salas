@@ -362,12 +362,13 @@ export async function generateSignaturePDF(session: Session): Promise<Buffer> {
   const pageW = doc.page.width - 80;
   const ROW_H = 22;
 
-  // Layout: Nº | Lugar | Nome | Assinatura
-  const C_NUM   = 50;  const W_NUM   = 24;
-  const C_LUGAR = 78;  const W_LUGAR = 48;
-  const C_NOME  = 130; const W_NOME  = 200;
-  const C_SIG   = 334;
-  const W_SIG   = pageW - (C_SIG - 40) - 10;
+  // Layout: Nº | Lugar | Turma | Nome | Assinatura
+  const C_NUM    = 50;  const W_NUM    = 24;
+  const C_LUGAR  = 78;  const W_LUGAR  = 48;
+  const C_TURMA  = 130; const W_TURMA  = 52;
+  const C_NOME   = 186; const W_NOME   = 140;
+  const C_SIG    = 334;
+  const W_SIG    = pageW - (C_SIG - 40) - 10;
 
   const subtitle = `${session.config.sessionName}   ·   ${session.config.examDate}   ·   Lista de Presença`;
 
@@ -376,6 +377,7 @@ export async function generateSignaturePDF(session: Session): Promise<Buffer> {
     doc.fillColor('white').fontSize(7.5).font('Helvetica-Bold');
     doc.text('Nº',         C_NUM,   ty + 4, { width: W_NUM,   lineBreak: false });
     doc.text('Lugar',      C_LUGAR, ty + 4, { width: W_LUGAR, lineBreak: false });
+    doc.text('Turma',      C_TURMA, ty + 4, { width: W_TURMA, lineBreak: false });
     doc.text('Nome',       C_NOME,  ty + 4, { width: W_NOME,  lineBreak: false });
     doc.text('Assinatura', C_SIG,   ty + 4, { width: W_SIG,   lineBreak: false });
     return ty + 16;
@@ -419,6 +421,8 @@ export async function generateSignaturePDF(session: Session): Promise<Buffer> {
         .text(String(idx + 1), C_NUM, ty, { width: W_NUM, lineBreak: false });
       doc.fillColor('#6b7280').fontSize(7)
         .text(`F${alloc.rowNumber}·C${alloc.seatNumber}`, C_LUGAR, ty, { width: W_LUGAR, lineBreak: false });
+      doc.fillColor('#374151').fontSize(7.5).font('Helvetica')
+        .text(alloc.classCode, C_TURMA, ty, { width: W_TURMA, lineBreak: false });
       doc.fillColor('#111827').fontSize(8).font('Helvetica-Bold')
         .text(alloc.studentName, C_NOME, ty, { width: W_NOME, lineBreak: false, ellipsis: true });
 
